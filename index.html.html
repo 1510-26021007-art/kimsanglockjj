@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>me enamre de ti a primera vista - 파스타 요리 게임</title>
+    <!-- Tailwind CSS for UI overlay -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            touch-action: manipulation;
+        }
+        body {
+            font-family: 'Fredoka', 'Nanum Gothic', sans-serif;
+            background: #0f172a;
+            user-select: none;
+            -webkit-user-select: none;
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: #f43f5e;
+            border-radius: 8px;
+        }
+
+        /* 70px x 70px 반투명 터치 버튼 스타일 */
+        .touch-btn {
+            width: 70px !important;
+            height: 70px !important;
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            border: 1.5px solid rgba(255, 255, 255, 0.25);
+            border-radius: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-weight: 800;
+            user-select: none;
+            -webkit-user-select: none;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+            transition: transform 0.05s ease, background-color 0.1s ease;
+        }
+        .touch-btn:active, .touch-btn.active {
+            background: rgba(244, 63, 94, 0.8) !important;
+            border-color: rgba(255, 255, 255, 0.8) !important;
+            transform: scale(0.92);
+        }
+
+        /* 컴퓨터/마우스 환경(hover 가 가능하고 세로 폭이 넓은 PC)에서는 터치 버튼 숨김 */
+        @media (hover: hover) and (pointer: fine) and (min-width: 768px) {
+            #mobile-controls {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-center items-center relative overflow-hidden bg-gradient-to-br from-slate-950 via-purple-950 to-rose-950 text-white">
+
+    <!-- Container for Canvas and Overlays -->
+    <div id="game-container" class="relative w-full max-w-5xl h-[95vh] max-h-[800px] flex flex-col items-center justify-center p-2">
+
+        <!-- Upper Bar Header UI -->
+        <div id="top-bar" class="w-full flex justify-between items-center bg-slate-900/80 backdrop-blur border border-rose-500/30 px-3 py-2 rounded-2xl mb-2 text-xs sm:text-base z-10 shadow-lg">
+            <!-- Game Title & Status -->
+            <div class="flex items-center gap-2 sm:gap-3">
+                <span class="text-rose-400 font-bold text-base sm:text-lg hidden sm:inline">🍝 me enamre de ti a primera vista</span>
+                <span class="bg-rose-500/20 text-rose-300 border border-rose-500/40 px-2.5 py-0.5 rounded-full text-xs font-semibold">
+                    Round <span id="round-display">1</span>
+                </span>
+            </div>
+
+            <!-- Stats: Timer, Satisfaction, Money -->
+            <div class="flex items-center gap-3 sm:gap-6">
+                <!-- Timer -->
+                <div class="flex items-center gap-1">
+                    <span class="text-amber-400 text-base sm:text-lg">⏳</span>
+                    <span id="timer-display" class="font-mono font-bold text-lg sm:text-xl text-amber-300">02:00</span>
+                </div>
+
+                <!-- Overall Satisfaction Bar -->
+                <div class="flex items-center gap-1.5">
+                    <span class="text-rose-400 text-base sm:text-lg">❤️</span>
+                    <div class="w-20 sm:w-36 bg-slate-800 h-3.5 sm:h-4 rounded-full overflow-hidden border border-slate-700 p-0.5">
+                        <div id="satisfaction-bar" class="bg-gradient-to-r from-rose-500 to-pink-400 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+                    </div>
+                    <span id="satisfaction-text" class="font-bold text-xs sm:text-sm text-pink-300">100%</span>
+                </div>
+
+                <!-- Persistent Money -->
+                <div class="flex items-center gap-1 bg-emerald-950/60 border border-emerald-500/40 px-2.5 py-1 rounded-xl">
+                    <span class="text-emerald-400 font-bold text-base sm:text-lg">💰</span>
+                    <span id="money-display" class="font-mono font-extrabold text-emerald-400 text-base sm:text-xl">$0</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Canvas Frame -->
+        <div class="relative w-full h-full flex justify-center items-center overflow-hidden rounded-2xl border-2 border-rose-500/30 shadow-2xl bg-slate-950">
+            <canvas id="gameCanvas" class="w-full h-full object-contain rounded-2xl"></canvas>
+
+            <!-- 핸드폰 전용 반투명 터치 조작 버튼 (가로 70px x 세로 70px) -->
+            <div id="mobile-controls" class="absolute bottom-3 left-3 right-3 flex justify-between items-end pointer-events-none z-20">
+                <!-- D-Pad 방향키 -->
+                <div class="grid grid-cols-3 gap-1.5 pointer-events-auto bg-slate-950/40 p-1.5 rounded-3xl border border-white/10 backdrop-blur-sm">
+                    <div></div>
+                    <button id="btn-up" class="touch-btn text-xl">▲</button>
+                    <div></div>
+                    <button id="btn-left" class="touch-btn text-xl">◀</button>
+                    <button id="btn-down" class="touch-btn text-xl">▼</button>
+                    <button id="btn-right" class="touch-btn text-xl">▶</button>
+                </div>
+
+                <!-- 상호작용 버튼 -->
+                <div class="pointer-events-auto">
+                    <button id="btn-action" class="touch-btn !bg-rose-600/60 border-rose-300/50">
+                        <span class="text-2xl">✋</span>
+                        <span class="text-[10px] font-bold mt-0.5">상호작용</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 1. START SCREEN OVERLAY -->
+        <div id="start-overlay" class="absolute inset-0 z-30 bg-slate-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-2xl">
+            <div class="animate-bounce text-6xl mb-2">🍝💖</div>
+            <h1 class="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-rose-400 via-pink-400 to-amber-300 mb-2">
+                me enamre de ti a primera vista
+            </h1>
+            <p class="text-rose-200 text-xs sm:text-base max-w-lg mb-6 leading-relaxed">
+                "첫눈에 반해버린 완벽한 파스타 레스토랑!"<br/>
+                손님의 만족도를 유지하며 2분 동안 최상의 파스타를 대접하세요.<br/>
+                벌어들인 돈으로 고급 재료를 해금하고 $10,000를 모아 그녀의 마음을 얻으세요!
+            </p>
+
+            <div class="bg-slate-900/80 border border-slate-700 p-4 rounded-xl max-w-md w-full mb-6 text-left text-xs sm:text-sm space-y-2 text-slate-300">
+                <div class="font-bold text-rose-400 text-center text-base mb-1">🎮 조작 가이드</div>
+                <div class="flex items-center justify-between"><span>이동</span><span class="bg-slate-800 px-2 py-0.5 rounded border border-slate-600 text-amber-300">방향키 (▲▼◀▶) / WASD / 화면 터치</span></div>
+                <div class="flex items-center justify-between"><span>상호작용 (집기/요리/서빙)</span><span class="bg-slate-800 px-2 py-0.5 rounded border border-slate-600 text-amber-300">스페이스바 (Space) / E / ✋ 버튼</span></div>
+                <div class="flex items-center justify-between"><span>일시정지</span><span class="bg-slate-800 px-2 py-0.5 rounded border border-slate-600 text-amber-300">ESC 키</span></div>
+                <div class="flex items-center justify-between"><span>재료당 가격</span><span class="text-emerald-400 font-semibold">재료 1개당 3원 (면+소스: 6원, 면+소스+토핑: 9원)</span></div>
+            </div>
+
+            <button id="start-btn" class="px-8 py-3.5 bg-gradient-to-r from-rose-500 via-pink-500 to-rose-600 hover:from-rose-600 hover:to-pink-700 text-white font-extrabold text-lg sm:text-xl rounded-2xl shadow-xl shadow-rose-900/50 transform hover:scale-105 transition active:scale-95 border-2 border-rose-300 cursor-pointer">
+                ❤️ 게임 시작하기 (Start Game)
+            </button>
+        </div>
+
+        <!-- 2. SHOP OVERLAY (상점 화면) -->
+        <div id="shop-overlay" class="hidden absolute inset-0 z-30 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-between p-4 sm:p-6 rounded-2xl">
+            <div class="text-center w-full max-w-2xl">
+                <div id="shop-title-badge" class="inline-block bg-rose-500/20 border border-rose-500 text-rose-300 px-4 py-1 rounded-full text-xs font-bold mb-2">영업 준비 & 주방 상점</div>
+                <h2 id="shop-header-text" class="text-2xl sm:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-amber-300 to-rose-400">
+                    직전 영업 수익: <span id="round-earnings-text" class="text-emerald-400">$0</span>
+                </h2>
+                <p class="text-xs sm:text-sm text-slate-400 mt-1">소지금: <span id="total-money-text" class="text-emerald-300 font-bold">$0</span> | 고급 재료와 아이템을 정비하세요!</p>
+            </div>
+
+            <!-- Tab Buttons for Shop -->
+            <div class="flex gap-2 my-3">
+                <button id="tab-recipes" class="px-4 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs sm:text-sm shadow cursor-pointer">🍝 레시피 & 재료 구매</button>
+                <button id="tab-decor" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs sm:text-sm border border-slate-700 cursor-pointer">✨ 주방 & 특별 아이템</button>
+            </div>
+
+            <!-- Shop Item Lists Container -->
+            <div class="w-full max-w-3xl flex-1 overflow-y-auto custom-scroll px-2 py-1">
+                <!-- Recipes / Ingredients Tab -->
+                <div id="list-recipes" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+
+                <!-- Kitchen Decor & Special Items Tab -->
+                <div id="list-decor" class="hidden grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
+            </div>
+
+            <!-- Bottom Actions -->
+            <div class="w-full max-w-md pt-3 flex gap-4">
+                <button id="start-shift-btn" class="w-full py-3.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-extrabold text-lg rounded-xl shadow-lg border border-emerald-300 transform active:scale-95 transition cursor-pointer">
+                    ▶ 다음 영업 시작하기 (Start Shift)
+                </button>
+            </div>
+        </div>
+
+        <!-- 3. PAUSE OVERLAY (ESC 키 일시정지) -->
+        <div id="pause-overlay" class="hidden absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-2xl">
+            <div class="text-6xl mb-3 animate-bounce">⏸️</div>
+            <h2 class="text-3xl sm:text-4xl font-black text-amber-300 mb-2">일시정지 (PAUSED)</h2>
+            <p class="text-slate-300 text-sm max-w-md mb-6">
+                게임을 잠시 멈췄습니다.<br/>
+                <span class="text-amber-400 font-semibold">ESC 키</span>를 다시 누르거나 아래 버튼을 누르면 재개합니다.
+            </p>
+            <button id="resume-btn" class="px-8 py-3.5 bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-600 hover:to-rose-600 text-white font-extrabold text-lg rounded-2xl shadow-lg border border-amber-300 transform hover:scale-105 active:scale-95 transition cursor-pointer">
+                ▶ 계속하기 (Resume)
+            </button>
+        </div>
+
+        <!-- 4. GAME OVER OVERLAY (만족도 0% 시 상점으로 리턴) -->
+        <div id="gameover-overlay" class="hidden absolute inset-0 z-40 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-2xl">
+            <div class="text-6xl mb-3 animate-pulse">💔</div>
+            <h2 class="text-3xl sm:text-4xl font-black text-rose-500 mb-2">손님들이 떠나갔습니다!</h2>
+            <p class="text-slate-300 text-sm max-w-md mb-6">
+                만족도가 0%로 떨어져 라운드가 종료되었습니다.<br/>
+                상점으로 돌아가 주방을 정비하고 다시 도전해 보세요!
+            </p>
+            <button id="retry-to-shop-btn" class="px-8 py-3.5 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold rounded-2xl shadow-lg text-lg border border-rose-400 transform hover:scale-105 active:scale-95 transition cursor-pointer">
+                🛍️ 상점으로 돌아가기
+            </button>
+        </div>
+
+        <!-- 5. GAME CLEAR / ENDING OVERLAY ('그녀의 마음' $10,000 구매 시) -->
+        <div id="clear-overlay" class="hidden absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center rounded-2xl">
+            <div class="animate-bounce text-7xl mb-3">💖👑✨</div>
+            <h2 class="text-3xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-pink-400 via-rose-300 to-amber-300 mb-2">
+                HAPPY ENDING! 그녀의 마음을 얻었습니다!
+            </h2>
+            <p class="text-rose-200 text-sm sm:text-base max-w-lg mb-6 leading-relaxed">
+                진심 어린 요리와 최고의 레스토랑 서비스로 그녀의 마음을 영원히 사로잡았습니다!<br/>
+                "me enamre de ti a primera vista - 첫눈에 반한 완벽한 사랑의 완성!"
+            </p>
+
+            <div class="bg-slate-900/90 border border-rose-500/40 p-4 rounded-xl max-w-md w-full mb-6 text-center space-y-2">
+                <div class="text-rose-400 font-bold text-base border-b border-slate-700 pb-2">🏆 명예의 셰프 기록</div>
+                <div class="flex justify-between text-sm text-slate-300 px-4">
+                    <span>도달 라운드:</span>
+                    <span id="final-round-text" class="text-amber-400 font-bold">1 라운드</span>
+                </div>
+                <div class="flex justify-between text-sm text-slate-300 px-4">
+                    <span>최종 잔액:</span>
+                    <span id="final-money-text" class="text-emerald-400 font-bold">$10,000</span>
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-4">
+                <button id="clear-continue-btn" class="px-6 py-3 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white font-bold rounded-xl shadow-lg border border-rose-300 transform active:scale-95 transition cursor-pointer">
+                    🌹 영업 계속하기 (자유 모드)
+                </button>
+                <button id="restart-game-btn" class="px-6 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-xl border border-slate-600 transform active:scale-95 transition cursor-pointer">
+                    🔄 처음부터 새로 시작하기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN GAME ENGINE & CANVAS LOGIC -->
+    <script>
+        // --- Web Audio Synthesizer ---
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) audioCtx = new AudioCtx();
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+
+        function playSound(type) {
+            initAudio();
+            if (!audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                const now = audioCtx.currentTime;
+
+                if (type === 'pickup') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(440, now);
+                    osc.frequency.exponentialRampToValueAtTime(880, now + 0.08);
+                    gain.gain.setValueAtTime(0.2, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.08);
+                    osc.start(now);
+                    osc.stop(now + 0.08);
+                } else if (type === 'cook') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(260, now);
+                    osc.frequency.linearRampToValueAtTime(400, now + 0.12);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.12);
+                    osc.start(now);
+                    osc.stop(now + 0.12);
+                } else if (type === 'serve') {
+                    [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+                        const o = audioCtx.createOscillator();
+                        const g = audioCtx.createGain();
+                        o.type = 'sine';
+                        o.frequency.setValueAtTime(freq, now + idx * 0.06);
+                        g.connect(audioCtx.destination);
+                        o.connect(g);
+                        g.gain.setValueAtTime(0.2, now + idx * 0.06);
+                        g.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
+                        o.start(now + idx * 0.06);
+                        o.stop(now + idx * 0.06 + 0.25);
+                    });
+                } else if (type === 'buy') {
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(587.33, now);
+                    osc.frequency.setValueAtTime(880, now + 0.08);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'error') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, now);
+                    osc.frequency.setValueAtTime(120, now + 0.1);
+                    gain.gain.setValueAtTime(0.25, now);
+                    gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                }
+            } catch (e) {}
+        }
+
+        // --- Overlay Manager ---
+        function hideAllOverlays() {
+            const overlayIds = ['start-overlay', 'shop-overlay', 'pause-overlay', 'gameover-overlay', 'clear-overlay'];
+            overlayIds.forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.classList.add('hidden');
+            });
+        }
+
+        // --- Game Canvas Setup ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        const CANVAS_WIDTH = 1000;
+        const CANVAS_HEIGHT = 700;
+        canvas.width = CANVAS_WIDTH;
+        canvas.height = CANVAS_HEIGHT;
+
+        // Dynamic State Variables
+        let gameActive = false;
+        let isPaused = false;
+        let roundNumber = 1;
+        let roundTimer = 120; // 2분
+        let overallSatisfaction = 100.0;
+        let totalMoney = 0;
+        let roundMoney = 0;
+
+        // Key states
+        const keys = { Up: false, Down: false, Left: false, Right: false };
+
+        // Player Chef
+        const chef = {
+            x: 500,
+            y: 420,
+            radius: 28,
+            speed: 5.5,
+            holding: null
+        };
+
+        // --- Database & Upgrades ---
+        const recipeUnlocks = [
+            { id: 'tomato', name: '토마토 소스', cost: 30, icon: '🍅', unlocked: true, desc: '상큼한 정통 이탈리안 소스' },
+            { id: 'cream', name: '크림 소스 (까르보나라)', cost: 60, icon: '🥛', unlocked: false, desc: '부드럽고 고소한 풍미' },
+            { id: 'meatball', name: '수제 미트볼 토핑', cost: 100, icon: '🧆', unlocked: false, desc: '손님들의 마음을 사로잡는 고기 토핑' },
+            { id: 'mushroom', name: '양송이 버섯 토핑', cost: 120, icon: '🍄', unlocked: false, desc: '풍미 깊은 최고급 식감' },
+            { id: 'truffle', name: '트러플 & 로즈 럭셔리', cost: 250, icon: '🌹', unlocked: false, desc: '첫눈에 반하게 만드는 럭셔리 재료' }
+        ];
+
+        const decorUpgrades = [
+            { id: 'tablecloth', name: '장미빛 벨벳 테이블보', cost: 50, icon: '🍷', applied: false, desc: '테이블을 럭셔리하게 바꿔 팁 +$5' },
+            { id: 'candles', name: '로맨틱 촛대 장식', cost: 90, icon: '🕯️', applied: false, desc: '손님 만족도 감소 속도 20% 감소' },
+            { id: 'goldpot', name: '황금 냄비 & 팬', cost: 150, icon: '🍳', applied: false, desc: '면과 요리 익는 속도 35% 향상' },
+            { id: 'flooring', name: '하트 대리석 바닥', cost: 200, icon: '✨', applied: false, desc: '셰프 이동 속도 증가' },
+            { id: 'holywater', name: '벌컥벌컥 그녀의 성수', cost: 500, icon: '🍷', applied: false, desc: '마시면 힘이 솟구쳐 요리 서빙 수익 10% 증가!' },
+            { id: 'herheart', name: '💖 그녀의 마음', cost: 10000, icon: '💖', applied: false, desc: '첫눈에 반한 그녀의 마음을 사로잡아 게임 최종 클리어!' }
+        ];
+
+        // --- Kitchen Workstations ---
+        const stations = [
+            { id: 'noodle_crate', name: '생파스타 면', x: 120, y: 150, width: 80, height: 70, color: '#f59e0b', type: 'ingredient_noodle' },
+            { id: 'sauce_shelf', name: '소스 선반', x: 220, y: 150, width: 100, height: 70, color: '#ef4444', type: 'ingredient_sauce' },
+            { id: 'topping_shelf', name: '토핑 선반', x: 340, y: 150, width: 100, height: 70, color: '#10b981', type: 'ingredient_topping' },
+            { id: 'boiling_pot', name: '면 삶는 냄비', x: 500, y: 150, width: 90, height: 70, color: '#3b82f6', type: 'pot', state: 'empty', progress: 0 },
+            { id: 'frying_pan', name: '구이용 프라이팬', x: 620, y: 150, width: 90, height: 70, color: '#6366f1', type: 'pan', state: 'empty', progress: 0, sauce: null, topping: null },
+            { id: 'plate_table', name: '접시 거치대', x: 760, y: 150, width: 80, height: 70, color: '#e2e8f0', type: 'plates' },
+            { id: 'trash_bin', name: '쓰레기통', x: 860, y: 150, width: 60, height: 70, color: '#475569', type: 'trash' },
+        ];
+
+        const diningTables = [
+            { id: 1, x: 220, y: 550, width: 120, height: 80, customer: null },
+            { id: 2, x: 500, y: 550, width: 120, height: 80, customer: null },
+            { id: 3, x: 780, y: 550, width: 120, height: 80, customer: null }
+        ];
+
+        let particles = [];
+
+        function spawnHeartParticles(x, y, count = 8) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x + (Math.random() - 0.5) * 40,
+                    y: y + (Math.random() - 0.5) * 20,
+                    vx: (Math.random() - 0.5) * 3,
+                    vy: -Math.random() * 3 - 1,
+                    size: Math.random() * 12 + 12,
+                    alpha: 1.0,
+                    char: Math.random() > 0.3 ? '❤️' : '✨'
+                });
+            }
+        }
+
+        // --- Customer Constructor ---
+        function Customer(table) {
+            this.table = table;
+            this.satisfaction = 100.0;
+
+            const availableSauces = recipeUnlocks.filter(r => r.unlocked && (r.id === 'tomato' || r.id === 'cream'));
+            const availableToppings = recipeUnlocks.filter(r => r.unlocked && (r.id === 'meatball' || r.id === 'mushroom' || r.id === 'truffle'));
+
+            const chosenSauce = availableSauces[Math.floor(Math.random() * availableSauces.length)];
+            const needTopping = Math.random() > 0.35 && availableToppings.length > 0;
+            const chosenTopping = needTopping ? availableToppings[Math.floor(Math.random() * availableToppings.length)] : null;
+
+            let baseValue = 3 + (chosenSauce ? 3 : 0) + (chosenTopping ? 3 : 0);
+
+            this.order = {
+                sauce: chosenSauce ? chosenSauce.id : 'tomato',
+                topping: chosenTopping ? chosenTopping.id : null,
+                value: baseValue
+            };
+
+            const colors = ['#f472b6', '#fb7185', '#38bdf8', '#c084fc', '#fbbf24'];
+            this.color = colors[Math.floor(Math.random() * colors.length)];
+        }
+
+        function updateCustomers(delta) {
+            let decayMultiplier = decorUpgrades.find(d => d.id === 'candles').applied ? 0.8 : 1.0;
+
+            diningTables.forEach(t => {
+                if (t.customer) {
+                    let c = t.customer;
+                    c.satisfaction -= delta * 2.8 * decayMultiplier;
+
+                    if (c.satisfaction < 50) {
+                        overallSatisfaction -= delta * 0.8;
+                    }
+
+                    if (c.satisfaction <= 0) {
+                        overallSatisfaction -= 15.0;
+                        playSound('error');
+                        t.customer = null;
+                    }
+                } else {
+                    if (Math.random() < 0.012 && gameActive && !isPaused) {
+                        t.customer = new Customer(t);
+                    }
+                }
+            });
+
+            overallSatisfaction = Math.max(0, Math.min(100, overallSatisfaction));
+
+            if (overallSatisfaction <= 0 && gameActive) {
+                triggerGameOver();
+            }
+        }
+
+        // --- Interaction Logic ---
+        function handleInteraction() {
+            if (!gameActive || isPaused) return;
+
+            let nearestStation = null;
+            let minDist = 95;
+
+            stations.forEach(s => {
+                let centerX = s.x + s.width / 2;
+                let centerY = s.y + s.height / 2;
+                let dist = Math.hypot(chef.x - centerX, chef.y - centerY);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestStation = s;
+                }
+            });
+
+            let nearestTable = null;
+            diningTables.forEach(t => {
+                let centerX = t.x + t.width / 2;
+                let centerY = t.y + t.height / 2;
+                let dist = Math.hypot(chef.x - centerX, chef.y - centerY);
+                if (dist < minDist) {
+                    minDist = dist;
+                    nearestTable = t;
+                }
+            });
+
+            if (nearestStation) {
+                const s = nearestStation;
+
+                if (s.type === 'ingredient_noodle') {
+                    if (!chef.holding) {
+                        chef.holding = { type: 'raw_noodle' };
+                        playSound('pickup');
+                    }
+                } else if (s.type === 'pot') {
+                    if (chef.holding && chef.holding.type === 'raw_noodle' && s.state === 'empty') {
+                        s.state = 'boiling';
+                        s.progress = 0;
+                        chef.holding = null;
+                        playSound('cook');
+                    } else if (!chef.holding && s.state === 'cooked') {
+                        chef.holding = { type: 'boiled_noodle' };
+                        s.state = 'empty';
+                        s.progress = 0;
+                        playSound('pickup');
+                    }
+                } else if (s.type === 'pan') {
+                    if (chef.holding && chef.holding.type === 'boiled_noodle' && s.state === 'empty') {
+                        s.state = 'frying';
+                        s.progress = 0;
+                        s.sauce = null;
+                        s.topping = null;
+                        chef.holding = null;
+                        playSound('cook');
+                    } else if (chef.holding && (chef.holding.type === 'sauce' || chef.holding.type === 'topping') && (s.state === 'frying' || s.state === 'cooked')) {
+                        if (chef.holding.type === 'sauce') {
+                            s.sauce = chef.holding.id;
+                            playSound('cook');
+                        }
+                        if (chef.holding.type === 'topping') {
+                            s.topping = chef.holding.id;
+                            playSound('cook');
+                        }
+                        chef.holding = null;
+                    } else if (!chef.holding && s.state === 'cooked') {
+                        chef.holding = {
+                            type: 'plated_pasta',
+                            sauce: s.sauce || 'tomato',
+                            topping: s.topping || null
+                        };
+                        s.state = 'empty';
+                        s.progress = 0;
+                        s.sauce = null;
+                        s.topping = null;
+                        playSound('pickup');
+                    }
+                } else if (s.type === 'ingredient_sauce') {
+                    const sauces = recipeUnlocks.filter(r => r.unlocked && (r.id === 'tomato' || r.id === 'cream'));
+                    if (!chef.holding) {
+                        chef.holding = { type: 'sauce', id: sauces[0].id, name: sauces[0].name };
+                        playSound('pickup');
+                    } else if (chef.holding.type === 'sauce') {
+                        let idx = sauces.findIndex(s => s.id === chef.holding.id);
+                        idx = (idx + 1) % sauces.length;
+                        chef.holding.id = sauces[idx].id;
+                        chef.holding.name = sauces[idx].name;
+                        playSound('pickup');
+                    }
+                } else if (s.type === 'ingredient_topping') {
+                    const toppings = recipeUnlocks.filter(r => r.unlocked && (r.id === 'meatball' || r.id === 'mushroom' || r.id === 'truffle'));
+                    if (toppings.length === 0) {
+                        playSound('error');
+                        return;
+                    }
+                    if (!chef.holding) {
+                        chef.holding = { type: 'topping', id: toppings[0].id, name: toppings[0].name };
+                        playSound('pickup');
+                    } else if (chef.holding.type === 'topping') {
+                        let idx = toppings.findIndex(t => t.id === chef.holding.id);
+                        idx = (idx + 1) % toppings.length;
+                        chef.holding.id = toppings[idx].id;
+                        chef.holding.name = toppings[idx].name;
+                        playSound('pickup');
+                    }
+                } else if (s.type === 'plates') {
+                    if (!chef.holding) {
+                        chef.holding = { type: 'empty_plate' };
+                        playSound('pickup');
+                    }
+                } else if (s.type === 'trash') {
+                    if (chef.holding) {
+                        chef.holding = null;
+                        playSound('pickup');
+                    }
+                }
+            }
+
+            // Serve Customer at Dining Table
+            if (nearestTable && nearestTable.customer && chef.holding && chef.holding.type === 'plated_pasta') {
+                const c = nearestTable.customer;
+                const served = chef.holding;
+
+                const sauceMatch = served.sauce === c.order.sauce;
+                const toppingMatch = served.topping === c.order.topping;
+
+                if (sauceMatch && toppingMatch) {
+                    let tip = decorUpgrades.find(d => d.id === 'tablecloth').applied ? 5 : 0;
+                    let satisfactionBonus = Math.floor(c.satisfaction / 5);
+                    let earned = c.order.value + tip + satisfactionBonus;
+
+                    const holyWater = decorUpgrades.find(d => d.id === 'holywater');
+                    if (holyWater && holyWater.applied) {
+                        earned = Math.round(earned * 1.1);
+                    }
+
+                    roundMoney += earned;
+                    totalMoney += earned;
+                    overallSatisfaction = Math.min(100, overallSatisfaction + 12);
+
+                    spawnHeartParticles(nearestTable.x + 60, nearestTable.y + 40, 12);
+                    playSound('serve');
+
+                    chef.holding = null;
+                    nearestTable.customer = null;
+                    updateHUD();
+                } else {
+                    overallSatisfaction -= 10;
+                    playSound('error');
+                    chef.holding = null;
+                }
+            }
+        }
+
+        // --- Appliance Cooking Progress Updater ---
+        function updateAppliances(delta) {
+            let speedBoost = decorUpgrades.find(d => d.id === 'goldpot').applied ? 1.6 : 1.0;
+
+            stations.forEach(s => {
+                if (s.type === 'pot' && s.state === 'boiling') {
+                    s.progress += delta * 30 * speedBoost;
+                    if (s.progress >= 100) {
+                        s.state = 'cooked';
+                        s.progress = 100;
+                    }
+                } else if (s.type === 'pan' && s.state === 'frying') {
+                    s.progress += delta * 25 * speedBoost;
+                    if (s.progress >= 100) {
+                        s.state = 'cooked';
+                        s.progress = 100;
+                    }
+                }
+            });
+        }
+
+        // --- Render Engine ---
+        function render() {
+            ctx.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            let isMarble = decorUpgrades.find(d => d.id === 'flooring').applied;
+            ctx.fillStyle = isMarble ? '#2d1b2e' : '#1e1b2e';
+            ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+            ctx.strokeStyle = isMarble ? 'rgba(244, 63, 94, 0.15)' : 'rgba(255, 255, 255, 0.05)';
+            ctx.lineWidth = 2;
+            const tileSize = 50;
+            for (let x = 0; x < CANVAS_WIDTH; x += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, CANVAS_HEIGHT);
+                ctx.stroke();
+            }
+            for (let y = 0; y < CANVAS_HEIGHT; y += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(CANVAS_WIDTH, y);
+                ctx.stroke();
+            }
+
+            ctx.strokeStyle = '#f43f5e';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(0, 420);
+            ctx.lineTo(CANVAS_WIDTH, 420);
+            ctx.stroke();
+
+            ctx.fillStyle = 'rgba(244, 63, 94, 0.35)';
+            ctx.font = 'bold 16px Nanum Gothic';
+            ctx.textAlign = 'left';
+            ctx.fillText('👩‍🍳 KITCHEN AREA', 30, 40);
+            ctx.fillText('🌹 ROMANTIC DINING TERRACE', 30, 450);
+
+            stations.forEach(s => {
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.fillRect(s.x + 4, s.y + 6, s.width, s.height);
+
+                ctx.fillStyle = s.color;
+                ctx.beginPath();
+                ctx.roundRect(s.x, s.y, s.width, s.height, 12);
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff33';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.font = 'bold 13px Fredoka';
+                ctx.fillText(s.name, s.x + s.width / 2, s.y - 8);
+
+                if (s.type === 'ingredient_noodle') {
+                    ctx.font = '28px serif';
+                    ctx.fillText('🍝', s.x + s.width / 2, s.y + 45);
+                } else if (s.type === 'ingredient_sauce') {
+                    ctx.font = '24px serif';
+                    ctx.fillText('🍅🥛', s.x + s.width / 2, s.y + 45);
+                } else if (s.type === 'ingredient_topping') {
+                    ctx.font = '24px serif';
+                    ctx.fillText('🧆🍄', s.x + s.width / 2, s.y + 45);
+                } else if (s.type === 'plates') {
+                    ctx.font = '28px serif';
+                    ctx.fillText('🍽️', s.x + s.width / 2, s.y + 45);
+                } else if (s.type === 'trash') {
+                    ctx.font = '26px serif';
+                    ctx.fillText('🗑️', s.x + s.width / 2, s.y + 45);
+                } else if (s.type === 'pot') {
+                    let potIcon = decorUpgrades.find(d => d.id === 'goldpot').applied ? '🌟🍲' : '🍲';
+                    ctx.font = '28px serif';
+                    ctx.fillText(potIcon, s.x + s.width / 2, s.y + 45);
+
+                    if (s.state === 'boiling' || s.state === 'cooked') {
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(s.x + 10, s.y + 55, s.width - 20, 8);
+                        ctx.fillStyle = s.state === 'cooked' ? '#10b981' : '#3b82f6';
+                        ctx.fillRect(s.x + 10, s.y + 55, (s.width - 20) * (s.progress / 100), 8);
+                    }
+                } else if (s.type === 'pan') {
+                    let panIcon = decorUpgrades.find(d => d.id === 'goldpot').applied ? '🌟🍳' : '🍳';
+                    ctx.font = '28px serif';
+                    ctx.fillText(panIcon, s.x + s.width / 2, s.y + 45);
+
+                    if (s.sauce || s.topping) {
+                        let text = (s.sauce === 'cream' ? '🥛' : '🍅') + (s.topping === 'meatball' ? '🧆' : s.topping === 'mushroom' ? '🍄' : s.topping === 'truffle' ? '🌹' : '');
+                        ctx.font = '14px serif';
+                        ctx.fillText(text, s.x + s.width / 2, s.y + 20);
+                    }
+
+                    if (s.state === 'frying' || s.state === 'cooked') {
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(s.x + 10, s.y + 55, s.width - 20, 8);
+                        ctx.fillStyle = s.state === 'cooked' ? '#10b981' : '#f59e0b';
+                        ctx.fillRect(s.x + 10, s.y + 55, (s.width - 20) * (s.progress / 100), 8);
+                    }
+                }
+            });
+
+            diningTables.forEach(t => {
+                let hasCloth = decorUpgrades.find(d => d.id === 'tablecloth').applied;
+                let hasCandles = decorUpgrades.find(d => d.id === 'candles').applied;
+
+                ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+                ctx.beginPath();
+                ctx.ellipse(t.x + t.width / 2, t.y + t.height / 2 + 10, 65, 45, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = hasCloth ? '#be123c' : '#78350f';
+                ctx.beginPath();
+                ctx.ellipse(t.x + t.width / 2, t.y + t.height / 2, 60, 40, 0, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = hasCloth ? '#f43f5e' : '#b45309';
+                ctx.lineWidth = 4;
+                ctx.stroke();
+
+                if (hasCandles) {
+                    ctx.font = '18px serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🕯️', t.x + t.width / 2, t.y + t.height / 2 - 5);
+                }
+
+                if (t.customer) {
+                    const c = t.customer;
+                    const cx = t.x + t.width / 2;
+                    const cy = t.y - 20;
+
+                    ctx.fillStyle = c.color;
+                    ctx.beginPath();
+                    ctx.arc(cx, cy, 22, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(cx - 7, cy - 4, 5, 0, Math.PI * 2);
+                    ctx.arc(cx + 7, cy - 4, 5, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = '#0f172a';
+                    ctx.beginPath();
+                    ctx.arc(cx - 7, cy - 4, 2, 0, Math.PI * 2);
+                    ctx.arc(cx + 7, cy - 4, 2, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = '#0f172a';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    if (c.satisfaction > 40) {
+                        ctx.arc(cx, cy + 4, 6, 0, Math.PI);
+                    } else {
+                        ctx.arc(cx, cy + 10, 6, Math.PI, 0);
+                    }
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#0f172a';
+                    ctx.fillRect(cx - 30, cy - 40, 60, 7);
+                    ctx.fillStyle = c.satisfaction > 50 ? '#10b981' : c.satisfaction > 25 ? '#f59e0b' : '#ef4444';
+                    ctx.fillRect(cx - 30, cy - 40, 60 * (c.satisfaction / 100), 7);
+
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.roundRect(cx + 25, cy - 50, 75, 45, 10);
+                    ctx.fill();
+                    ctx.strokeStyle = '#f43f5e';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    let sauceIcon = c.order.sauce === 'cream' ? '🥛' : '🍅';
+                    let toppingIcon = c.order.topping === 'meatball' ? '🧆' : c.order.topping === 'mushroom' ? '🍄' : c.order.topping === 'truffle' ? '🌹' : '';
+                    ctx.font = '16px serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(`🍝${sauceIcon}${toppingIcon}`, cx + 62, cy - 22);
+                }
+            });
+
+            // Render Player (Chef)
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+            ctx.beginPath();
+            ctx.ellipse(chef.x, chef.y + 20, chef.radius, chef.radius / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#f8fafc';
+            ctx.beginPath();
+            ctx.arc(chef.x, chef.y, chef.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            ctx.fillStyle = '#ef4444';
+            ctx.beginPath();
+            ctx.arc(chef.x, chef.y + 12, 10, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath();
+            ctx.arc(chef.x - 8, chef.y - 4, 3, 0, Math.PI * 2);
+            ctx.arc(chef.x + 8, chef.y - 4, 3, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(chef.x - 16, chef.y - 42, 32, 18);
+            ctx.beginPath();
+            ctx.arc(chef.x, chef.y - 42, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            if (chef.holding) {
+                const item = chef.holding;
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(chef.x, chef.y - 55, 18, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = '#f43f5e';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.font = '16px serif';
+                ctx.textAlign = 'center';
+                if (item.type === 'raw_noodle') ctx.fillText('🍝', chef.x, chef.y - 50);
+                else if (item.type === 'boiled_noodle') ctx.fillText('♨️', chef.x, chef.y - 50);
+                else if (item.type === 'sauce') ctx.fillText(item.id === 'cream' ? '🥛' : '🍅', chef.x, chef.y - 50);
+                else if (item.type === 'topping') ctx.fillText(item.id === 'meatball' ? '🧆' : item.id === 'mushroom' ? '🍄' : '🌹', chef.x, chef.y - 50);
+                else if (item.type === 'empty_plate') ctx.fillText('🍽️', chef.x, chef.y - 50);
+                else if (item.type === 'plated_pasta') {
+                    let sauceIcon = item.sauce === 'cream' ? '🥛' : '🍅';
+                    let toppingIcon = item.topping === 'meatball' ? '🧆' : item.topping === 'mushroom' ? '🍄' : item.topping === 'truffle' ? '🌹' : '';
+                    ctx.fillText(`🍝${sauceIcon}${toppingIcon}`, chef.x, chef.y - 50);
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.alpha -= 0.02;
+
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.font = `${p.size}px serif`;
+                ctx.textAlign = 'center';
+                ctx.fillText(p.char, p.x, p.y);
+                ctx.globalAlpha = 1.0;
+
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+        }
+
+        // --- Chef Movement Logic ---
+        function updateMovement(delta) {
+            let speed = chef.speed * (decorUpgrades.find(d => d.id === 'flooring').applied ? 1.3 : 1.0);
+
+            if (keys.Up) chef.y -= speed;
+            if (keys.Down) chef.y += speed;
+            if (keys.Left) chef.x -= speed;
+            if (keys.Right) chef.x += speed;
+
+            chef.x = Math.max(chef.radius + 10, Math.min(CANVAS_WIDTH - chef.radius - 10, chef.x));
+            chef.y = Math.max(200, Math.min(CANVAS_HEIGHT - chef.radius - 10, chef.y));
+        }
+
+        // --- Pause Logic ---
+        function pauseGame() {
+            if (!gameActive || isPaused) return;
+            isPaused = true;
+            document.getElementById('pause-overlay').classList.remove('hidden');
+        }
+
+        function resumeGame() {
+            if (!isPaused) return;
+            isPaused = false;
+            document.getElementById('pause-overlay').classList.add('hidden');
+        }
+
+        // --- Main Game Loop ---
+        let lastTime = performance.now();
+        function gameLoop(now) {
+            let delta = (now - lastTime) / 1000;
+            if (isNaN(delta) || delta > 0.1) delta = 0.016;
+            lastTime = now;
+
+            if (gameActive && !isPaused) {
+                roundTimer -= delta;
+                if (roundTimer <= 0) {
+                    roundTimer = 0;
+                    finishShift();
+                }
+
+                updateMovement(delta);
+                updateAppliances(delta);
+                updateCustomers(delta);
+                updateHUD();
+            }
+
+            render();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // --- HUD Updater ---
+        function updateHUD() {
+            document.getElementById('round-display').innerText = roundNumber;
+
+            let mins = Math.floor(roundTimer / 60);
+            let secs = Math.floor(roundTimer % 60);
+            document.getElementById('timer-display').innerText = `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+            document.getElementById('satisfaction-bar').style.width = `${overallSatisfaction}%`;
+            document.getElementById('satisfaction-text').innerText = `${Math.round(overallSatisfaction)}%`;
+
+            document.getElementById('money-display').innerText = `$${totalMoney}`;
+        }
+
+        // --- Controls Event Listeners ---
+        window.addEventListener('keydown', e => {
+            initAudio();
+            if (e.key === 'Escape' || e.key === 'Esc') {
+                if (gameActive && !isPaused) pauseGame();
+                else if (isPaused) resumeGame();
+            }
+
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.Up = true;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.Down = true;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.Left = true;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.Right = true;
+
+            if (e.key === ' ' || e.key === 'e' || e.key === 'E') {
+                e.preventDefault();
+                handleInteraction();
+            }
+        });
+
+        window.addEventListener('keyup', e => {
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.Up = false;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.Down = false;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.Left = false;
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.Right = false;
+        });
+
+        // Touch Controls Helper
+        const bindTouchBtn = (id, keyName) => {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            
+            const startPress = (e) => {
+                e.preventDefault();
+                initAudio();
+                keys[keyName] = true;
+                btn.classList.add('active');
+            };
+            const endPress = (e) => {
+                e.preventDefault();
+                keys[keyName] = false;
+                btn.classList.remove('active');
+            };
+
+            btn.addEventListener('touchstart', startPress, { passive: false });
+            btn.addEventListener('touchend', endPress, { passive: false });
+            btn.addEventListener('touchcancel', endPress, { passive: false });
+            btn.addEventListener('mousedown', startPress);
+            btn.addEventListener('mouseup', endPress);
+            btn.addEventListener('mouseleave', endPress);
+        };
+
+        bindTouchBtn('btn-up', 'Up');
+        bindTouchBtn('btn-down', 'Down');
+        bindTouchBtn('btn-left', 'Left');
+        bindTouchBtn('btn-right', 'Right');
+
+        const actionBtn = document.getElementById('btn-action');
+        if (actionBtn) {
+            const triggerAction = (e) => {
+                e.preventDefault();
+                initAudio();
+                handleInteraction();
+            };
+            actionBtn.addEventListener('touchstart', triggerAction, { passive: false });
+            actionBtn.addEventListener('click', triggerAction);
+        }
+
+        // --- Shop & Upgrade UI Management ---
+        function openShopOverlay() {
+            gameActive = false;
+            isPaused = false;
+            hideAllOverlays();
+            document.getElementById('round-earnings-text').innerText = `$${roundMoney}`;
+            document.getElementById('total-money-text').innerText = `$${totalMoney}`;
+            document.getElementById('shop-overlay').classList.remove('hidden');
+            renderShopLists();
+        }
+
+        function renderShopLists() {
+            const recipeList = document.getElementById('list-recipes');
+            recipeList.innerHTML = recipeUnlocks.map(item => `
+                <div class="bg-slate-900 border ${item.unlocked ? 'border-emerald-500/40 bg-emerald-950/10' : 'border-slate-700'} p-3 rounded-xl flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl">${item.icon}</span>
+                        <div>
+                            <div class="font-bold text-sm text-slate-100">${item.name}</div>
+                            <div class="text-xs text-slate-400">${item.desc}</div>
+                        </div>
+                    </div>
+                    ${item.unlocked 
+                        ? `<span class="text-xs font-bold text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-500/30">해금 완료</span>`
+                        : `<button onclick="buyItem('recipe', '${item.id}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg shadow active:scale-95 transition cursor-pointer">
+                            $${item.cost} 구매
+                           </button>`
+                    }
+                </div>
+            `).join('');
+
+            const decorList = document.getElementById('list-decor');
+            decorList.innerHTML = decorUpgrades.map(item => `
+                <div class="bg-slate-900 border ${item.applied ? 'border-amber-500/40 bg-amber-950/10' : 'border-slate-700'} p-3 rounded-xl flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="text-3xl">${item.icon}</span>
+                        <div>
+                            <div class="font-bold text-sm text-slate-100">${item.name}</div>
+                            <div class="text-xs text-slate-400">${item.desc}</div>
+                        </div>
+                    </div>
+                    ${item.applied 
+                        ? `<span class="text-xs font-bold text-amber-400 bg-amber-950 px-2.5 py-1 rounded-full border border-amber-500/30">적용됨</span>`
+                        : `<button onclick="buyItem('decor', '${item.id}')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs rounded-lg shadow active:scale-95 transition cursor-pointer">
+                            $${item.cost} 구매
+                           </button>`
+                    }
+                </div>
+            `).join('');
+        }
+
+        window.buyItem = function(type, id) {
+            initAudio();
+            if (type === 'recipe') {
+                const item = recipeUnlocks.find(r => r.id === id);
+                if (item && !item.unlocked && totalMoney >= item.cost) {
+                    totalMoney -= item.cost;
+                    item.unlocked = true;
+                    playSound('buy');
+                    updateHUD();
+                    renderShopLists();
+                } else {
+                    playSound('error');
+                }
+            } else if (type === 'decor') {
+                const item = decorUpgrades.find(d => d.id === id);
+                if (item && !item.applied && totalMoney >= item.cost) {
+                    totalMoney -= item.cost;
+                    item.applied = true;
+                    playSound('buy');
+                    updateHUD();
+                    renderShopLists();
+
+                    if (id === 'herheart') {
+                        triggerGameClear();
+                    }
+                } else {
+                    playSound('error');
+                }
+            }
+        };
+
+        // Tab Switching in Shop
+        document.getElementById('tab-recipes').addEventListener('click', () => {
+            document.getElementById('list-recipes').classList.remove('hidden');
+            document.getElementById('list-decor').classList.add('hidden');
+            document.getElementById('tab-recipes').className = "px-4 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs sm:text-sm shadow cursor-pointer";
+            document.getElementById('tab-decor').className = "px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs sm:text-sm border border-slate-700 cursor-pointer";
+        });
+
+        document.getElementById('tab-decor').addEventListener('click', () => {
+            document.getElementById('list-decor').classList.remove('hidden');
+            document.getElementById('list-recipes').classList.add('hidden');
+            document.getElementById('tab-decor').className = "px-4 py-2 bg-rose-600 text-white font-bold rounded-xl text-xs sm:text-sm shadow cursor-pointer";
+            document.getElementById('tab-recipes').className = "px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold rounded-xl text-xs sm:text-sm border border-slate-700 cursor-pointer";
+        });
+
+        // --- Game Lifecycle Actions ---
+        function startGame() {
+            initAudio();
+            hideAllOverlays();
+
+            roundNumber = 1;
+            totalMoney = 0;
+
+            recipeUnlocks.forEach(r => r.unlocked = (r.id === 'tomato'));
+            decorUpgrades.forEach(d => d.applied = false);
+
+            startNewShift();
+        }
+
+        function startNewShift() {
+            hideAllOverlays();
+            roundTimer = 120;
+            overallSatisfaction = 100.0;
+            roundMoney = 0;
+            chef.x = 500;
+            chef.y = 420;
+            chef.holding = null;
+
+            stations.forEach(s => { s.state = 'empty'; s.progress = 0; });
+            diningTables.forEach(t => { t.customer = null; });
+
+            gameActive = true;
+            isPaused = false;
+            updateHUD();
+        }
+
+        function finishShift() {
+            gameActive = false;
+            roundNumber++;
+            openShopOverlay();
+        }
+
+        function triggerGameOver() {
+            gameActive = false;
+            isPaused = false;
+            hideAllOverlays();
+            document.getElementById('gameover-overlay').classList.remove('hidden');
+        }
+
+        function triggerGameClear() {
+            gameActive = false;
+            isPaused = false;
+            hideAllOverlays();
+            document.getElementById('final-round-text').innerText = `${roundNumber} 라운드`;
+            document.getElementById('final-money-text').innerText = `$${totalMoney}`;
+            document.getElementById('clear-overlay').classList.remove('hidden');
+            playSound('serve');
+        }
+
+        // Helper for attaching click/touch handlers cleanly
+        function bindClick(id, fn) {
+            const btn = document.getElementById(id);
+            if (!btn) return;
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                initAudio();
+                fn(e);
+            });
+        }
+
+        // Button Click Handlers
+        bindClick('start-btn', startGame);
+        bindClick('start-shift-btn', startNewShift);
+        bindClick('resume-btn', resumeGame);
+        bindClick('retry-to-shop-btn', openShopOverlay);
+        bindClick('clear-continue-btn', openShopOverlay);
+        bindClick('restart-game-btn', startGame);
+
+        // Immediate Loop Start
+        requestAnimationFrame(gameLoop);
+    </script>
+</body>
+</html>
